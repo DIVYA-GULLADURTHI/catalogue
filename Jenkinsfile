@@ -66,7 +66,7 @@ pipeline {
                 script {
                    build job: 'catalogue-cd',
                     parameters: [
-                        string(name: 'appVersion', value: "${appVersion}"),
+                        string(name: 'appversion', value: "${appversion}"),
                         string(name: 'deploy_to', value: 'dev')
                     ],
                    propagate: false, // even sg fails VPC will not be effected
