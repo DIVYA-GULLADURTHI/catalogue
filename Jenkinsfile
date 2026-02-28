@@ -103,14 +103,7 @@ pipeline {
             steps {
                 script {
                     withAWS(credentials: 'aws-credits', region: 'us-east-1') {
-                        sh """
-                            aws ecr describe-repositories \
-                            --repository-names ${PROJECT}/${COMPONENT} \
-                            --region ${REGION} || \
-                            aws ecr create-repository \
-                            --repository-name ${PROJECT}/${COMPONENT} \
-                            --region ${REGION}
-
+                        sh """ 
                             aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com
                             docker build -t ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${PROJECT}/${COMPONENT}:${appversion} . 
                             docker push ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${PROJECT}/${COMPONENT}:${appversion}
