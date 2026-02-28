@@ -116,10 +116,39 @@ pipeline {
             steps {
                 script {
                     withAWS(credentials: 'aws-credits', region: 'us-east-1') {
-                    // Fetch scan findings
+
+                        // 1. Start scan (safe even if scan-on-push is enabled)
+                        sh """
+                        aws ecr start-image-scan \
+                            --repository-name ${PROJECT}/${COMPONENT} \
+                            --image-id imageTag=${appversion} \
+                            --region ${REGION} || true
+                        """
+
+                        // 2. Wait for scan to complete
+                        timeout(time: 5, unit: 'MINUTES') {
+                            waitUntil {
+                                def status = sh(
+                                    script: """
+                                    aws ecr describe-image-scan-findings \
+                                        --repository-name ${PROJECT}/${COMPONENT} \
+                                        --image-id imageTag=${appversion} \
+                                        --region ${REGION} \
+                                        --query 'imageScanStatus.status' \
+                                        --output text
+                                    """,
+                                    returnStdout: true
+                                ).trim()
+
+                                echo "ECR scan status: ${status}"
+                                return status == "COMPLETE"
+                            }
+                        }
+
+                        // 3. Fetch findings
                         def findings = sh(
                             script: """
-                                aws ecr describe-image-scan-findings \
+                            aws ecr describe-image-scan-findings \
                                 --repository-name ${PROJECT}/${COMPONENT} \
                                 --image-id imageTag=${appversion} \
                                 --region ${REGION} \
@@ -128,17 +157,20 @@ pipeline {
                             returnStdout: true
                         ).trim()
 
-                        // Parse JSON
                         def json = readJSON text: findings
 
+                        // 4. Filter HIGH / CRITICAL
                         def highCritical = json.imageScanFindings.findings.findAll {
-                            it.severity == "HIGH" || it.severity == "CRITICAL"
+                            it.severity in ["HIGH", "CRITICAL"]
                         }
 
+                        // 5. Fail only if needed
                         if (highCritical.size() > 0) {
                             echo "❌ Found ${highCritical.size()} HIGH/CRITICAL vulnerabilities!"
-                            currentBuild.result = 'FAILURE'
-                            error("Build failed due to vulnerabilities")
+                            highCritical.each {
+                                echo "- ${it.name} (${it.severity})"
+                            }
+                            error("Build failed due to ECR vulnerabilities")
                         } else {
                             echo "✅ No HIGH/CRITICAL vulnerabilities found."
                         }
