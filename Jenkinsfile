@@ -135,7 +135,7 @@ pipeline {
                             --region ${REGION} || true
                         """
 
-                        // 2. Wait for scan to complete
+                        // 2. Wait for scan to complete (CLI-safe)
                         timeout(time: 5, unit: 'MINUTES') {
                             waitUntil {
                                 def status = sh(
@@ -145,17 +145,22 @@ pipeline {
                                         --image-id imageTag=${appversion} \
                                         --region ${REGION} \
                                         --query 'imageScanStatus.status' \
-                                        --output text
+                                        --output text 2>/dev/null || echo NOT_READY
                                     """,
                                     returnStdout: true
                                 ).trim()
 
                                 echo "ECR scan status: ${status}"
+
+                                if (status == "FAILED") {
+                                    error("ECR image scan failed")
+                                }
+
                                 return status == "COMPLETE"
                             }
                         }
 
-                        // 3. Fetch findings
+                        // 3. Fetch findings (now guaranteed to exist)
                         def findings = sh(
                             script: """
                             aws ecr describe-image-scan-findings \
