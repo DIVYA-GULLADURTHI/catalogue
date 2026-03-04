@@ -1,13 +1,13 @@
-@Library('jenkins-shared-library') _
+@@Library('jenkins-shared-library') _
 
 def configMap = [
     project : "roboshop",
     component: "catalogue"
 ]
 
-if( ! env.BRANCH_NAME.equalsIgnoreCase('main') ){ // if not equals to main
-    nodejsEKSPipeline(configMap) // by default it will call, call function inside this pipeline
+if( !"main".equalsIgnoreCase(env.BRANCH_NAME) ){
+    nodejsEKSPipeline(configMap)
 }
 else{
     echo "Please proceed with PROD process"
-} 
+}
